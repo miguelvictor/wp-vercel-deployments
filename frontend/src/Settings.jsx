@@ -1,168 +1,125 @@
-import { useCallback, useReducer, useEffect, useState } from "react";
-import { readProjects, saveProjects } from "./api";
+import { useCallback, useEffect, useState } from "react";
+import { getTeams, readSettings, saveSettings } from "./api";
 
 import "./Settings.css";
 
-const Actions = {
-  LoadProjects: "LOAD_PROJECTS",
-  AddNewProject: "ADD_NEW_PROJECT",
-  UpdateProjectName: "UPDATE_PROJECT_NAME",
-  UpdateProjectUrl: "UPDATE_PROJECT_URL",
-};
-
-const initialState = {
-  projects: [],
-};
-
-const reducer = (state, action) => {
-  switch (action.type) {
-    case Actions.LoadProjects:
-      return {
-        ...state,
-        projects: action.payload,
-      };
-    case Actions.AddNewProject:
-      return {
-        ...state,
-        projects: [...state.projects, { name: "", url: "" }],
-      };
-    case Actions.UpdateProjectName:
-      return {
-        ...state,
-        projects: state.projects.map(({ name, url }, i) => ({
-          name: action.payload.index === i ? action.payload.value : name,
-          url,
-        })),
-      };
-    case Actions.UpdateProjectUrl:
-      return {
-        ...state,
-        projects: state.projects.map(({ name, url }, i) => ({
-          name,
-          url: action.payload.index === i ? action.payload.value : url,
-        })),
-      };
-    default:
-      return state;
-  }
-};
-
-const isValidUrl = (urlToValidate) => {
-  let url;
-
-  try {
-    url = new URL(urlToValidate);
-  } catch (_) {
-    return false;
-  }
-
-  return url.protocol === "http:" || url.protocol === "https:";
-};
-const isValid = (projects) =>
-  projects.every(
-    ({ name, url }) => name.trim().length === 0 || isValidUrl(url)
-  );
-
 export default function App() {
   const [isLoading, setLoading] = useState(false);
-  const [{ projects }, dispatch] = useReducer(reducer, initialState);
-  const changeHandler = useCallback(
-    (e) => {
-      const type =
-        e.target.type === "text"
-          ? Actions.UpdateProjectName
-          : Actions.UpdateProjectUrl;
-      const index =
-        e.target.type === "text"
-          ? parseInt(e.target.id.substring(5))
-          : parseInt(e.target.id.substring(4));
-      dispatch({ type, payload: { index, value: e.target.value } });
-    },
-    [dispatch]
-  );
-  const addHandler = useCallback(
-    (e) => {
-      e.preventDefault();
-      dispatch({ type: Actions.AddNewProject });
-    },
-    [dispatch]
-  );
+  const [accessToken, setAccessToken] = useState("");
+  const [teams, setTeams] = useState([]);
+  const [activeTeamID, setActiveTeamID] = useState(null);
+  const verifyHandler = useCallback(() => {
+    setLoading(true);
+    getTeams(accessToken)
+      .then((teams) => {
+        if (teams.length > 0) {
+          setTeams(teams);
+          setActiveTeamID(teams[0].id);
+        }
+      })
+      .finally(() => setLoading(false));
+  }, [accessToken, setTeams, setActiveTeamID]);
   const saveHandler = useCallback(() => {
-    if (isValid(projects)) {
+    if (accessToken && activeTeamID) {
+      const settings = { accessToken, activeTeamID };
       setLoading(true);
-      saveProjects(projects.filter(({ name }) => name.trim().length > 0))
-        .then(() => window.location.reload(false))
-        .catch(console.error)
-        .finally(() => setLoading(false));
-    } else {
-      alert("invalid!");
+      saveSettings(settings).then(() => window.location.reload(false));
     }
-  }, [projects]);
+  }, [accessToken, activeTeamID]);
 
-  // effects
+  // load already existing settings
   useEffect(() => {
     setLoading(true);
-    readProjects()
-      .then((projects) =>
-        dispatch({ type: Actions.LoadProjects, payload: projects })
-      )
+    readSettings()
+      .then((settings) => {
+        if (settings.hasOwnProperty("activeTeamID") && settings.activeTeamID) {
+          setActiveTeamID(settings.activeTeamID);
+        }
+
+        if (settings.hasOwnProperty("accessToken") && settings.accessToken) {
+          setAccessToken(settings.accessToken);
+          return getTeams(settings.accessToken);
+        }
+      })
+      .then((teams) => {
+        if (Array.isArray(teams) && teams.length > 0) {
+          setTeams(teams);
+          if (teams.findIndex(({ id }) => id === activeTeamID) === -1) {
+            setActiveTeamID(teams[0].id);
+          }
+        }
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, []);
+  }, [activeTeamID]);
 
-  // components
-  const rows = projects.map(({ name, url }, i) => (
-    <tr key={i}>
-      <td className="dfse-counter">{i + 1}</td>
+  // component builders
+  const teamSelector = teams.length > 0 && (
+    <tr>
+      <th>
+        <label htmlFor="vercel-team">Vercel Team</label>
+      </th>
       <td>
-        <input
-          className="dfse-form-input"
-          type="text"
-          name={`name-${i}`}
-          id={`name-${i}`}
-          value={name}
-          onChange={changeHandler}
-        />
-      </td>
-      <td>
-        <input
-          className="dfse-form-input"
-          type="url"
-          name={`url-${i}`}
-          id={`url-${i}`}
-          value={url}
-          onChange={changeHandler}
-        />
+        <select
+          id="vercel-team"
+          onChange={(e) => setActiveTeamID(e.target.value)}
+        >
+          {teams.map(({ id, slug, name }) => (
+            <option key={id} value={id}>
+              {slug} - {name}
+            </option>
+          ))}
+        </select>
+        <p>
+          Select the team which contains the multiple projects that you want to
+          manage.
+        </p>
       </td>
     </tr>
-  ));
+  );
 
   return (
     <>
       <h1>Vercel Deployment Settings</h1>
       <p>Some description here</p>
-      <table className="dfse-settings-table" cellPadding="0" cellSpacing="0">
-        <thead>
+
+      <table className="form-table">
+        <tbody>
           <tr>
-            <th>&nbsp;</th>
-            <th className="dfse-project-name">Name</th>
-            <th className="dfse-project-url">Deploy Hook URL</th>
+            <th>
+              <label htmlFor="vercel-access-token">Vercel Access Token</label>
+            </th>
+            <td>
+              <input
+                id="vercel-access-token"
+                className="regular-text"
+                type="text"
+                value={accessToken}
+                onChange={(e) => setAccessToken(e.target.value)}
+              />
+              &nbsp;
+              <button
+                className="button button-link button-dfse"
+                onClick={verifyHandler}
+                disabled={isLoading || accessToken.trim().length === 0}
+              >
+                Verify
+              </button>
+              <p>
+                The access token retrieved from the settings page of your Vercel
+                account.
+              </p>
+            </td>
           </tr>
-        </thead>
-        <tbody>{rows}</tbody>
+          {teamSelector}
+        </tbody>
       </table>
+
       <div className="dfse-actions">
-        <button
-          className="dfse-add-new-project button"
-          onClick={addHandler}
-          disabled={isLoading}
-        >
-          Add new project
-        </button>
         <button
           className="dfse-save button button-primary"
           onClick={saveHandler}
-          disabled={isLoading}
+          disabled={isLoading || !activeTeamID}
         >
           Save
         </button>

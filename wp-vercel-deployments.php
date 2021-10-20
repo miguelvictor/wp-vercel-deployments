@@ -19,9 +19,19 @@ function dfse_add_settings_page() {
         'dfse-vercel-deployments',
         'dfse_render_plugin_settings_page'
     );
+    add_menu_page(
+        'Vercel Deployments',
+        'Deploy to Vercel',
+        'manage_options',
+        'dfse-deploy-to-vercel',
+        'dfse_render_plugin_main_page'
+    );
 }
 function dfse_render_plugin_settings_page() {
-    echo '<div id="dfse_settings_container"></div>';
+    echo '<div id="dfse-settings-container"></div>';
+}
+function dfse_render_plugin_main_page() {
+    echo '<div id="dfse-main-container"></div>';
 }
 add_action('admin_menu', 'dfse_add_settings_page');
 
@@ -47,29 +57,17 @@ function dfse_vercel_settings_api_read() {
         return new WP_Error('forbidden', 'Forbidden', ['status' => 403]);
     }
 
-    $projects = get_option('dfse_vercel_deployments_projects', []);
+    $projects = get_option('dfse_vercel_deployments_settings', new stdClass());
     return $projects;
 }
 
 function dfse_vercel_settings_api_update($request) {
+    if (!current_user_can('manage_options')) {
+        return new WP_Error('forbidden', 'Forbidden', ['status' => 403]);
+    }
+
     $payload = $request->get_json_params();
-
-    // $payload should be a sequential array
-    if (!is_array($payload) || array_keys($payload) !== range(0, count($payload) - 1)) {
-        return new WP_Error('not-an-array', 'Payload should be an array', ['status' => 400]);
-    }
-
-    // $payload urls should be valid urls
-    foreach ($payload as $project) {
-        if (strlen(trim($project['name'])) === 0) {
-            return new WP_Error('invalid-name', 'Invalid project name: "' . $project['name'] . '"', ['status' => 400]);
-        }
-        if (filter_var($project['url'], FILTER_VALIDATE_URL) === FALSE) {
-            return new WP_Error('invalid-url', 'Invalid project url: "' . $project['url'] . '"', ['status' => 400]);
-        }
-    }
-
-    update_option('dfse_vercel_deployments_projects', $payload);
+    update_option('dfse_vercel_deployments_settings', $payload);
 }
 
 add_action('rest_api_init', function () {
