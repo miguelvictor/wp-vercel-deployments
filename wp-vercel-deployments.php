@@ -34,32 +34,52 @@ add_action('admin_enqueue_scripts', function () {
         $css_to_load = plugin_dir_url( __FILE__ ) . 'wp-vercel-deployments.css';
     }
 
-    wp_enqueue_style('wp-vercel-deployments', $css_to_load);
-    wp_enqueue_script('wp-vercel-deployments', $js_to_load, '', mt_rand(10,1000), true);
+    wp_enqueue_style('wp-vercel-deployments-css', $css_to_load);
+    wp_enqueue_script('wp-vercel-deployments-js', $js_to_load, [], false, true);
+    wp_localize_script('wp-api', 'wpApiSettings', [
+        'root' => esc_url_raw(rest_url()),
+        'nonce' => wp_create_nonce('wp_rest'),
+    ]);
 });
 
-function dfse_vercel_deployments_api_proxy($request) {
-  // first we get the query parameters from the request
-  $params = $request->get_query_params();
-  // we add the API key to the params we’ll send to the API
-  $params['apiKey'] = 'your_api_key_here';
-  // we get the endpoint since we’ll use that to construct the URL
-  $endpoint = $params['endpoint'];
-  // delete the endpoint since we no longer need it in the params
-  unset($params['endpoint']);
-  // convert the params back to a string
-  $query = http_build_query($params);
-  // build the URL using the endpoint and any params and make a remote GET request
-  $request = wp_remote_get("https://api.ghostinspector.com/v1$endpoint?$query");
-  // get the body from the response and return it as a JSON object
-  return json_decode(wp_remote_retrieve_body($request));
+function dfse_vercel_settings_api_read() {
+    if (!current_user_can('manage_options')) {
+        return new WP_Error('forbidden', 'Forbidden', ['status' => 403]);
+    }
+
+    $projects = get_option('dfse_vercel_deployments_projects', []);
+    return $projects;
+}
+
+function dfse_vercel_settings_api_update($request) {
+    $payload = $request->get_json_params();
+
+    // $payload should be a sequential array
+    if (!is_array($payload) || array_keys($payload) !== range(0, count($payload) - 1)) {
+        return new WP_Error('not-an-array', 'Payload should be an array', ['status' => 400]);
+    }
+
+    // $payload urls should be valid urls
+    foreach ($payload as $project) {
+        if (strlen(trim($project['name'])) === 0) {
+            return new WP_Error('invalid-name', 'Invalid project name: "' . $project['name'] . '"', ['status' => 400]);
+        }
+        if (filter_var($project['url'], FILTER_VALIDATE_URL) === FALSE) {
+            return new WP_Error('invalid-url', 'Invalid project url: "' . $project['url'] . '"', ['status' => 400]);
+        }
+    }
+
+    update_option('dfse_vercel_deployments_projects', $payload);
 }
 
 add_action('rest_api_init', function () {
-    register_rest_route('ghost-inspector/v1', '/proxy', array(
-        // By using this constant we ensure that when the WP_REST_Server changes our readable endpoints will work as intended.
+    register_rest_route('dfse-vercel/v1', '/read', array(
         'methods'  => WP_REST_Server::READABLE,
-        // Here we register our callback. The callback is fired when this endpoint is matched by the WP_REST_Server class.
-        'callback' => 'dfse_vercel_deployments',
+        'callback' => 'dfse_vercel_settings_api_read',
+    ));
+
+    register_rest_route('dfse-vercel/v1', '/update', array(
+        'methods'  => WP_REST_Server::CREATABLE,
+        'callback' => 'dfse_vercel_settings_api_update',
     ));
 });

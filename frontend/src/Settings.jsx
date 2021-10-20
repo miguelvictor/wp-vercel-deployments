@@ -1,6 +1,7 @@
-import { useCallback, useReducer } from "react";
+import { useCallback, useReducer, useEffect, useState } from "react";
+import { readProjects, saveProjects } from "./api";
 
-import "./App.css";
+import "./Settings.css";
 
 const Actions = {
   LoadProjects: "LOAD_PROJECTS",
@@ -59,10 +60,11 @@ const isValidUrl = (urlToValidate) => {
 };
 const isValid = (projects) =>
   projects.every(
-    ({ name, url }) => name.trim().length !== 0 && isValidUrl(url)
+    ({ name, url }) => name.trim().length === 0 || isValidUrl(url)
   );
 
 export default function App() {
+  const [isLoading, setLoading] = useState(false);
   const [{ projects }, dispatch] = useReducer(reducer, initialState);
   const changeHandler = useCallback(
     (e) => {
@@ -87,14 +89,30 @@ export default function App() {
   );
   const saveHandler = useCallback(() => {
     if (isValid(projects)) {
-      window.location.reload(false);
+      setLoading(true);
+      saveProjects(projects.filter(({ name }) => name.trim().length > 0))
+        .then(() => window.location.reload(false))
+        .catch(console.error)
+        .finally(() => setLoading(false));
     } else {
       alert("invalid!");
     }
   }, [projects]);
 
+  // effects
+  useEffect(() => {
+    setLoading(true);
+    readProjects()
+      .then((projects) =>
+        dispatch({ type: Actions.LoadProjects, payload: projects })
+      )
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  // components
   const rows = projects.map(({ name, url }, i) => (
-    <tr>
+    <tr key={i}>
       <td className="dfse-counter">{i + 1}</td>
       <td>
         <input
@@ -134,12 +152,17 @@ export default function App() {
         <tbody>{rows}</tbody>
       </table>
       <div className="dfse-actions">
-        <button className="dfse-add-new-project button" onClick={addHandler}>
+        <button
+          className="dfse-add-new-project button"
+          onClick={addHandler}
+          disabled={isLoading}
+        >
           Add new project
         </button>
         <button
           className="dfse-save button button-primary"
           onClick={saveHandler}
+          disabled={isLoading}
         >
           Save
         </button>

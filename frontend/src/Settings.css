@@ -1,5 +1,5 @@
 .dfse-settings-table {
-  border: 1px solid #ccc;
+  border: 1px solid #ddd;
 }
 
 .dfse-project-name {
@@ -7,12 +7,12 @@
 }
 
 .dfse-project-url {
-  width: 500px;
+  width: 650px;
 }
 
 .dfse-settings-table th,
 .dfse-settings-table td {
-  border: 1px solid #ccc;
+  border: 1px solid #ddd;
   padding: 8px 16px;
 }
 

@@ -3,12 +3,15 @@ import ReactDOM from "react-dom";
 import Settings from "./Settings";
 import reportWebVitals from "./reportWebVitals";
 
-ReactDOM.render(
-  <React.StrictMode>
-    <Settings />
-  </React.StrictMode>,
-  document.getElementById("dfse_settings_container")
-);
+const settingsContainer = document.getElementById("dfse_settings_container");
+if (settingsContainer) {
+  ReactDOM.render(
+    <React.StrictMode>
+      <Settings />
+    </React.StrictMode>,
+    settingsContainer
+  );
+}
 
 // If you want to start measuring performance in your app, pass a function
 // to log results (for example: reportWebVitals(console.log))
