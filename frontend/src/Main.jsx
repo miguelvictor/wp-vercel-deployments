@@ -65,7 +65,7 @@ export default function Main() {
     const deploymentId = project.latestDeployments[0].id;
     if (!deploymentId) return;
 
-    cancelLatestDeployment(accessToken, activeTeamID, id, deploymentId)
+    cancelLatestDeployment(accessToken, deploymentId, activeTeamID)
       .then((deployment) =>
         dispatch({
           type: Actions.UpdateDeployments,

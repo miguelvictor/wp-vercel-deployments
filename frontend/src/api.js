@@ -1,9 +1,7 @@
 export async function getTeams(accessToken) {
-  const url = "https://api.vercel.com/v1/teams";
+  const url = "https://api.vercel.com/v2/teams";
   const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
+    headers: { Authorization: `Bearer ${accessToken}` },
   });
   const { teams } = await response.json();
 
@@ -12,7 +10,7 @@ export async function getTeams(accessToken) {
 
 export async function getProjects(accessToken, teamId) {
   const url =
-    "https://api.vercel.com/v8/projects?" + new URLSearchParams({ teamId });
+    "https://api.vercel.com/v9/projects?" + new URLSearchParams({ teamId });
   const response = await fetch(url, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
@@ -28,7 +26,7 @@ export async function getProjects(accessToken, teamId) {
 
 export async function getLatestDeployments(accessToken, teamId, projectId) {
   const url =
-    "https://api.vercel.com/v5/now/deployments?" +
+    "https://api.vercel.com/v6/deployments?" +
     new URLSearchParams({ teamId, projectId });
   const response = await fetch(url, {
     headers: { Authorization: `Bearer ${accessToken}` },
@@ -46,13 +44,12 @@ export async function getLatestDeployments(accessToken, teamId, projectId) {
 
 export async function cancelLatestDeployment(
   accessToken,
-  teamId,
-  projectId,
-  deploymentId
+  deploymentId,
+  teamId
 ) {
   const url =
-    `https://api.vercel.com/v12/now/deployments/${deploymentId}/cancel?` +
-    new URLSearchParams({ teamId, projectId });
+    `https://api.vercel.com/v12/deployments/${deploymentId}/cancel?` +
+    new URLSearchParams({ teamId });
   const response = await fetch(url, {
     method: "PATCH",
     headers: { Authorization: `Bearer ${accessToken}` },
